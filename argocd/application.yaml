@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kata-challenge
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/CH1GU1/epam-katas-challenge # ajusta
+    targetRevision: main
+    path: helm/kata-challenge
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kata-challenge
+
+  syncPolicy:
+    automated:
+      prune: true # elimina recursos que ya no están en el chart
+      selfHeal: true # si alguien modifica algo manual en K8s, ArgoCD lo revierte
+    syncOptions:
+      - CreateNamespace=true # crea el namespace si no existe

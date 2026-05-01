@@ -1,0 +1,17 @@
+registry: ghcr.io
+
+backend:
+  image: ch1gu1/epam-katas-challenge-backend # ajusta al tuyo
+  tag: latest
+  port: 8000
+  replicas: 1
+
+frontend:
+  image: ch1gu1/epam-katas-challenge-frontend # ajusta al tuyo
+  tag: latest
+  port: 80
+  replicas: 1
+  apiUrl: http://kata-challenge.local/api
+
+ingress:
+  host: kata-challenge.local

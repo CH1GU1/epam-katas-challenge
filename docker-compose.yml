@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: ./katas-challenge-backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./katas-web-app
+      dockerfile: Dockerfile
+      args:
+        # En local, el frontend en el navegador de tu máquina apuntará al localhost expuesto
+        - VITE_API_URL=http://localhost:8000
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

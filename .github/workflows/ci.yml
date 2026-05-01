@@ -1,0 +1,89 @@
+name: CI - Katas Challenge
+
+on:
+    push:
+        branches: [ main ]
+    pull_request:
+        branches: [ main ]
+
+env:
+    REGISTRY: ghcr.io
+    # Esto generará una imagen tipo: ghcr.io/tu-usuario/epam-katas-challenge-backend
+    IMAGE_BASE: ${{ github.repository }}
+
+jobs:
+    backend-ci:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: "3.11"
+
+            - name: Install & Test
+              run: |
+                  cd katas-challenge-backend
+                  pip install -r requirements.txt
+                  pip install ruff pytest pytest-cov
+                  ruff check .
+                  pytest --cov=api --cov=katas --cov-report=xml
+
+            - name: Login to GHCR
+              if: github.event_name != 'pull_request'
+              uses: docker/login-action@v3
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build and Push Backend
+              if: github.event_name != 'pull_request'
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./katas-challenge-backend
+                  push: true
+                  tags: ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}-backend:latest
+
+    frontend-ci:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: "npm"
+                  cache-dependency-path: katas-web-app/package-lock.json
+
+            - name: Install & Test
+              run: |
+                  cd katas-web-app
+                  npm ci
+                  npm run test -- --run --coverage
+
+            - name: Login to GHCR
+              if: github.event_name != 'pull_request'
+              uses: docker/login-action@v3
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build and Push Frontend
+              if: github.event_name != 'pull_request'
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./katas-web-app
+                  push: true
+                  tags: ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}-frontend:latest
+                  build-args: |
+                      VITE_API_URL=http://localhost:8000

@@ -1,0 +1,22 @@
+# Node / Frontend
+node_modules/
+dist/
+.env*
+!.env.example
+coverage/
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+coverage.xml
+.coverage
+
+# Herramientas
+.DS_Store
+.idea/
+.vscode/
+EOF

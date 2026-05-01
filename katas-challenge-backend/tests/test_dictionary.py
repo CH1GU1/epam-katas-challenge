@@ -1,5 +1,3 @@
-import pytest
-
 from katas.dictionary_kata import Dictionary
 
 

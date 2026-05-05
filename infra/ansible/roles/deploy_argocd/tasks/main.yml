@@ -1,0 +1,22 @@
+- name: Crear namespace argocd
+  command: kubectl create namespace argocd
+  register: ns_result
+  failed_when:
+    - ns_result.rc != 0
+    - '"already exists" not in ns_result.stderr'
+  changed_when: ns_result.rc == 0
+
+- name: Instalar ArgoCD
+  command: >
+    kubectl apply -n argocd
+    --server-side
+    -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+- name: Esperar a que ArgoCD esté listo
+  command: >
+    kubectl wait --for=condition=available deployment/argocd-server
+    -n argocd --timeout=180s
+
+- name: Aplicar ArgoCD Application manifest
+  command: >
+    kubectl apply -f /home/chigui/epam-katas-challenge/argocd/application.yaml

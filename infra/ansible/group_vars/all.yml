@@ -1,0 +1,2 @@
+ansible_user: "{{ lookup('env', 'USER') }}"
+kubeconfig_path: "{{ lookup('env', 'HOME') }}/.kube/config"

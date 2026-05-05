@@ -1,0 +1,5 @@
+- name: Instalar ArgoCD
+  hosts: controllers
+  become: false
+  roles:
+    - deploy_argocd

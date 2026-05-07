@@ -93,4 +93,4 @@ jobs:
                   push: true
                   tags: ghcr.io/${{ env.IMAGE_NAME }}-frontend:latest
                   build-args: |
-                      VITE_API_URL=http://kata-challenge.local/api
+                      VITE_API_URL=http://localhost:8888/api

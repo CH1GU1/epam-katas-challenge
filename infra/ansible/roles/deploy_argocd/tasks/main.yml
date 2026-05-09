@@ -19,4 +19,4 @@
 
 - name: Apply ArgoCD Application manifest
   command: >
-    kubectl apply -f {{ playbook_dir }}/../../argocd/application.yaml
+    kubectl apply -f {{ playbook_dir }}/../../../argocd/application.yaml

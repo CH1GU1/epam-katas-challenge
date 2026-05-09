@@ -559,7 +559,31 @@ ansible-playbook playbooks/site.yml -i inventory/hosts.ini
 
 > This is a one-time setup. Once ArgoCD is installed, it manages all future application deployments.
 
-### 3. Create the GHCR Pull Secret
+### 3. Install ArgoCD Image Updater
+
+ArgoCD Image Updater is a companion component that watches container registries and automatically updates image tags when new versions are pushed — solving the "latest tag doesn't trigger a sync" problem.
+
+Install it in the `argocd` namespace:
+
+```bash
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/v0.15.0/manifests/install.yaml
+```
+
+Verify the pod is running:
+
+```bash
+kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-image-updater
+```
+
+**What Image Updater does:**
+- Polls GHCR every few minutes for new images
+- Compares image digests to detect changes (even when the tag is still `latest`)
+- Updates the Helm chart parameters in the ArgoCD Application automatically
+- Triggers ArgoCD to sync and redeploy the pods
+
+The `application.yaml` already contains the necessary annotations for Image Updater to track both the backend and frontend images.
+
+### 4. Create the GHCR Pull Secret
 
 ArgoCD will deploy pods that need to pull images from GitHub Container Registry. Create a Docker registry secret in the target namespace:
 
@@ -578,7 +602,7 @@ kubectl create secret docker-registry ghcr-secret \
 
 > 💡 **Tip**: Generate a GitHub Personal Access Token with `read:packages` scope at [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens).
 
-### 4. Apply the ArgoCD Application
+### 5. Apply the ArgoCD Application
 
 Connect the Git repository to ArgoCD so it can auto-sync the Helm chart:
 
@@ -586,9 +610,9 @@ Connect the Git repository to ArgoCD so it can auto-sync the Helm chart:
 kubectl apply -f argocd/application.yaml
 ```
 
-ArgoCD will now watch the `helm/kata-challenge` directory and automatically deploy any changes.
+ArgoCD will now watch the `helm/kata-challenge` directory and automatically deploy any changes. **Image Updater** will separately watch GHCR and update image tags when new images are pushed, causing ArgoCD to resync automatically.
 
-### 5. Access the Services (Windows)
+### 6. Access the Services (Windows)
 
 Use `kubectl port-forward` to expose the services locally:
 
@@ -605,7 +629,7 @@ kubectl port-forward svc/ingress-nginx-controller 8888:80 -n ingress-nginx
 | Application | http://localhost:8888 |
 | ArgoCD UI | https://localhost:8080 |
 
-### 6. Get the ArgoCD Admin Password
+### 7. Get the ArgoCD Admin Password
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret \
@@ -616,7 +640,7 @@ Login with:
 - **Username**: `admin`
 - **Password**: (the output from the command above)
 
-### 7. Verify Everything is Running
+### 8. Verify Everything is Running
 
 ```bash
 # Check the application namespace
@@ -628,6 +652,19 @@ kubectl get all -n argocd
 
 You should see pods running for both the backend and frontend, along with their services and the ingress controller.
 
+### How Image Updates Work Now
+
+With Image Updater in place, the flow after a code push is:
+
+1. Developer pushes code to `main`
+2. GitHub Actions builds and pushes new images to GHCR (tagged `latest`)
+3. **Image Updater** detects the new digest in GHCR (within ~2 minutes)
+4. Image Updater updates the ArgoCD Application parameters
+5. **ArgoCD** sees the parameter change and auto-syncs
+6. Kubernetes performs a rolling update of the affected pods
+
+No manual sync, no hard refresh, no `kubectl rollout restart` needed.
+
 ### Troubleshooting
 
 | Issue | Fix |
@@ -636,6 +673,8 @@ You should see pods running for both the backend and frontend, along with their 
 | `ErrImagePull` | Check that the image tag in `helm/kata-challenge/values.yaml` matches what's in GHCR |
 | Ingress not working | Ensure `minikube addons enable ingress` was run |
 | ArgoCD not syncing | Check the ArgoCD UI at `https://localhost:8080` for sync errors |
+| ArgoCD green but app not updated | ArgoCD only watches Git. Check that **Image Updater** pod is running (`kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-image-updater`). Also verify Image Updater can reach GHCR. |
+| Image Updater not detecting new images | Check Image Updater logs: `kubectl logs -n argocd deployment/argocd-image-updater`. Ensure `application.yaml` annotations are correct and the images are accessible from the cluster. |
 
 ---
 

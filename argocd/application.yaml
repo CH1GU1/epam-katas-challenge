@@ -3,11 +3,22 @@ kind: Application
 metadata:
   name: kata-challenge
   namespace: argocd
+  annotations:
+    # ArgoCD Image Updater — watches GHCR and auto-updates images
+    argocd-image-updater.argoproj.io/image-list: "backend=ghcr.io/ch1gu1/epam-katas-challenge-backend, frontend=ghcr.io/ch1gu1/epam-katas-challenge-frontend"
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+    argocd-image-updater.argoproj.io/backend.helm.image-name: backend.image
+    argocd-image-updater.argoproj.io/backend.helm.image-tag: backend.tag
+    argocd-image-updater.argoproj.io/backend.update-strategy: digest
+    argocd-image-updater.argoproj.io/frontend.helm.image-name: frontend.image
+    argocd-image-updater.argoproj.io/frontend.helm.image-tag: frontend.tag
+    argocd-image-updater.argoproj.io/frontend.update-strategy: digest
+
 spec:
   project: default
 
   source:
-    repoURL: https://github.com/CH1GU1/epam-katas-challenge # ajusta
+    repoURL: https://github.com/CH1GU1/epam-katas-challenge
     targetRevision: main
     path: helm/kata-challenge
 
@@ -17,7 +28,7 @@ spec:
 
   syncPolicy:
     automated:
-      prune: true # elimina recursos que ya no están en el chart
-      selfHeal: true # si alguien modifica algo manual en K8s, ArgoCD lo revierte
+      prune: true
+      selfHeal: true
     syncOptions:
-      - CreateNamespace=true # crea el namespace si no existe
+      - CreateNamespace=true

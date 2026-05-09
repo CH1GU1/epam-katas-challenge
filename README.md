@@ -26,6 +26,7 @@
   - [Helm Chart](#helm-chart)
   - [ArgoCD (GitOps)](#argocd-gitops)
   - [Ansible](#ansible)
+  - [Local Kubernetes Deployment](#local-kubernetes-deployment)
 - [License](#license)
 - [Author](#author)
 
@@ -528,6 +529,113 @@ ansible-playbook -i inventory/hosts.ini playbooks/site.yml
 ```
 
 This is typically a one-time setup step before applying the ArgoCD application.
+
+---
+
+## 🖥️ Local Kubernetes Deployment
+
+This guide walks you through deploying the entire stack on a local Kubernetes cluster using **Minikube**, **Ansible**, and **ArgoCD**. These steps mirror the full DevOps pipeline described in the [Architecture](#-devops-architecture--cicd-flow) section, but running entirely on your machine.
+
+### 1. Start Minikube
+
+Create a 2-node cluster with the Docker driver and enable the Ingress addon:
+
+```bash
+minikube start --nodes 2 --driver=docker
+minikube addons enable ingress
+
+# Verify
+kubectl get nodes
+```
+
+### 2. Install ArgoCD via Ansible
+
+Run the Ansible playbook to install ArgoCD in the cluster:
+
+```bash
+cd ~/epam-katas-challenge/infra/ansible
+ansible-playbook playbooks/site.yml -i inventory/hosts.ini
+```
+
+> This is a one-time setup. Once ArgoCD is installed, it manages all future application deployments.
+
+### 3. Create the GHCR Pull Secret
+
+ArgoCD will deploy pods that need to pull images from GitHub Container Registry. Create a Docker registry secret in the target namespace:
+
+```bash
+# Create the namespace first
+kubectl create namespace kata-challenge
+
+# Create the pull secret
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=ch1gu1 \
+  --docker-password=YOUR_GITHUB_TOKEN \
+  --docker-email=YOUR_EMAIL@gmail.com \
+  -n kata-challenge
+```
+
+> 💡 **Tip**: Generate a GitHub Personal Access Token with `read:packages` scope at [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens).
+
+### 4. Apply the ArgoCD Application
+
+Connect the Git repository to ArgoCD so it can auto-sync the Helm chart:
+
+```bash
+kubectl apply -f argocd/application.yaml
+```
+
+ArgoCD will now watch the `helm/kata-challenge` directory and automatically deploy any changes.
+
+### 5. Access the Services (Windows)
+
+Use `kubectl port-forward` to expose the services locally:
+
+```bash
+# Terminal 1 — ArgoCD UI
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# Terminal 2 — Application via Ingress
+kubectl port-forward svc/ingress-nginx-controller 8888:80 -n ingress-nginx
+```
+
+| Service | URL |
+|---------|-----|
+| Application | http://localhost:8888 |
+| ArgoCD UI | https://localhost:8080 |
+
+### 6. Get the ArgoCD Admin Password
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d && echo
+```
+
+Login with:
+- **Username**: `admin`
+- **Password**: (the output from the command above)
+
+### 7. Verify Everything is Running
+
+```bash
+# Check the application namespace
+kubectl get all -n kata-challenge
+
+# Check the ArgoCD namespace
+kubectl get all -n argocd
+```
+
+You should see pods running for both the backend and frontend, along with their services and the ingress controller.
+
+### Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| `ImagePullBackOff` | Verify the `ghcr-secret` exists and the token has `read:packages` |
+| `ErrImagePull` | Check that the image tag in `helm/kata-challenge/values.yaml` matches what's in GHCR |
+| Ingress not working | Ensure `minikube addons enable ingress` was run |
+| ArgoCD not syncing | Check the ArgoCD UI at `https://localhost:8080` for sync errors |
 
 ---
 

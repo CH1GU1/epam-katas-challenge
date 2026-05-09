@@ -12,9 +12,19 @@
     --server-side
     -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
+- name: ArgoCD Image Updater Install
+  command: >
+    kubectl apply -n argocd
+    -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/v0.15.0/manifests/install.yaml
+
 - name: Await for ArgoCD
   command: >
     kubectl wait --for=condition=available deployment/argocd-server
+    -n argocd --timeout=180s
+
+- name: Await for ArgoCD Image Updater
+  command: >
+    kubectl wait --for=condition=available deployment/argocd-image-updater
     -n argocd --timeout=180s
 
 - name: Apply ArgoCD Application manifest

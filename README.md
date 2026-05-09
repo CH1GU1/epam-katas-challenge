@@ -517,11 +517,21 @@ kubectl apply -f argocd/application.yaml
 - `prune: true` — Removes Kubernetes resources deleted from the Helm chart
 - `selfHeal: true` — Reverts any manual changes made directly in the cluster
 - `CreateNamespace=true` — Auto-creates the `kata-challenge` namespace
-- `automated sync` — No manual intervention needed after a push
+
+### ArgoCD Image Updater
+
+Image Updater is installed automatically by the [Ansible playbook](#ansible). It works alongside ArgoCD to solve the "`latest` tag doesn't trigger a sync" problem:
+
+- Polls GHCR every few minutes for new images
+- Compares image digests to detect changes (even when the tag is still `latest`)
+- Updates the Helm chart parameters in the ArgoCD Application automatically
+- Triggers ArgoCD to sync and redeploy the pods
+
+The `application.yaml` contains the necessary annotations for Image Updater to track both the backend and frontend images.
 
 ### Ansible
 
-For clusters that don't have ArgoCD yet, the Ansible playbook installs it:
+For clusters that don't have ArgoCD yet, the Ansible playbook installs both **ArgoCD** and **ArgoCD Image Updater**:
 
 ```bash
 cd infra/ansible
@@ -550,40 +560,20 @@ kubectl get nodes
 
 ### 2. Install ArgoCD via Ansible
 
-Run the Ansible playbook to install ArgoCD in the cluster:
+Run the Ansible playbook to install **ArgoCD** and **ArgoCD Image Updater** in the cluster:
 
 ```bash
 cd ~/epam-katas-challenge/infra/ansible
 ansible-playbook playbooks/site.yml -i inventory/hosts.ini
 ```
 
-> This is a one-time setup. Once ArgoCD is installed, it manages all future application deployments.
+> This is a one-time setup. The playbook installs:
+> - **ArgoCD** — the GitOps controller
+> - **ArgoCD Image Updater** — watches GHCR and auto-updates images when new versions are pushed
+>
+> Once installed, both services manage all future application deployments automatically.
 
-### 3. Install ArgoCD Image Updater
-
-ArgoCD Image Updater is a companion component that watches container registries and automatically updates image tags when new versions are pushed — solving the "latest tag doesn't trigger a sync" problem.
-
-Install it in the `argocd` namespace:
-
-```bash
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/v0.15.0/manifests/install.yaml
-```
-
-Verify the pod is running:
-
-```bash
-kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-image-updater
-```
-
-**What Image Updater does:**
-- Polls GHCR every few minutes for new images
-- Compares image digests to detect changes (even when the tag is still `latest`)
-- Updates the Helm chart parameters in the ArgoCD Application automatically
-- Triggers ArgoCD to sync and redeploy the pods
-
-The `application.yaml` already contains the necessary annotations for Image Updater to track both the backend and frontend images.
-
-### 4. Create the GHCR Pull Secret
+### 3. Create the GHCR Pull Secret
 
 ArgoCD will deploy pods that need to pull images from GitHub Container Registry. Create a Docker registry secret in the target namespace:
 
@@ -602,7 +592,7 @@ kubectl create secret docker-registry ghcr-secret \
 
 > 💡 **Tip**: Generate a GitHub Personal Access Token with `read:packages` scope at [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens).
 
-### 5. Apply the ArgoCD Application
+### 3. Apply the ArgoCD Application
 
 Connect the Git repository to ArgoCD so it can auto-sync the Helm chart:
 
@@ -610,9 +600,9 @@ Connect the Git repository to ArgoCD so it can auto-sync the Helm chart:
 kubectl apply -f argocd/application.yaml
 ```
 
-ArgoCD will now watch the `helm/kata-challenge` directory and automatically deploy any changes. **Image Updater** will separately watch GHCR and update image tags when new images are pushed, causing ArgoCD to resync automatically.
+ArgoCD will now watch the `helm/kata-challenge` directory and automatically deploy any changes. **Image Updater** (installed by the Ansible playbook) will separately watch GHCR and update image tags when new images are pushed, causing ArgoCD to resync automatically.
 
-### 6. Access the Services (Windows)
+### 4. Access the Services (Windows)
 
 Use `kubectl port-forward` to expose the services locally:
 
@@ -629,7 +619,7 @@ kubectl port-forward svc/ingress-nginx-controller 8888:80 -n ingress-nginx
 | Application | http://localhost:8888 |
 | ArgoCD UI | https://localhost:8080 |
 
-### 7. Get the ArgoCD Admin Password
+### 5. Get the ArgoCD Admin Password
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret \
@@ -640,7 +630,7 @@ Login with:
 - **Username**: `admin`
 - **Password**: (the output from the command above)
 
-### 8. Verify Everything is Running
+### 6. Verify Everything is Running
 
 ```bash
 # Check the application namespace

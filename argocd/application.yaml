@@ -7,8 +7,8 @@ metadata:
     argocd-image-updater.argoproj.io/image-list: >
       backend=ghcr.io/ch1gu1/epam-katas-challenge-backend,
       frontend=ghcr.io/ch1gu1/epam-katas-challenge-frontend
-    argocd-image-updater.argoproj.io/backend.update-strategy: latest
-    argocd-image-updater.argoproj.io/frontend.update-strategy: latest
+    argocd-image-updater.argoproj.io/backend.update-strategy: newest-build
+    argocd-image-updater.argoproj.io/frontend.update-strategy: newest-build
     argocd-image-updater.argoproj.io/backend.pull-secret: pullsecret:argocd/ghcr-image-updater
     argocd-image-updater.argoproj.io/frontend.pull-secret: pullsecret:argocd/ghcr-image-updater
 spec:

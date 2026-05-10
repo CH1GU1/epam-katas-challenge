@@ -1,4 +1,4 @@
-- name: Instalar ArgoCD
+- name: Install ArgoCD
   hosts: controllers
   become: false
   roles:

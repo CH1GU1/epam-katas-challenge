@@ -9,7 +9,7 @@ export const App = () => {
         <header className="text-center">
           <h1 className="text-3xl font-semibold">Kata Challenges</h1>
           <p className="text-sm text-muted-foreground">
-            3 interactive challenges | EPAM Kevin Mera
+            3 interactive challenges | EPAM Kevin Mera V2
           </p>
         </header>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">

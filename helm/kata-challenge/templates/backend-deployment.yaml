@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: backend
 spec:
+  revisionHistoryLimit: 2
   replicas: {{ .Values.backend.replicas }}
   selector:
     matchLabels:

@@ -16,6 +16,6 @@ spec:
         - name: ghcr-secret
       containers:
         - name: frontend
-          image: "{{ .Values.registry }}/{{ .Values.frontend.image }}:{{ .Values.frontend.tag }}"
+          image: "{{ .Values.frontend.image }}:{{ .Values.frontend.tag }}"
           ports:
             - containerPort: {{ .Values.frontend.port }}

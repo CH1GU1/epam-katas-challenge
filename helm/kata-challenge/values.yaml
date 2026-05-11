@@ -1,5 +1,3 @@
-registry: ghcr.io
-
 backend:
   image: ch1gu1/epam-katas-challenge-backend
   tag: latest

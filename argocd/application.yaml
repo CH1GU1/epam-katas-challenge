@@ -5,8 +5,8 @@ metadata:
   namespace: argocd
   annotations:
     argocd-image-updater.argoproj.io/image-list: >
-      backend=ghcr.io/ch1gu1/epam-katas-challenge-backend,
-      frontend=ghcr.io/ch1gu1/epam-katas-challenge-frontend
+      backend=ghcr.io/ch1gu1/epam-katas-challenge-backend:latest,
+      frontend=ghcr.io/ch1gu1/epam-katas-challenge-frontend:latest
     argocd-image-updater.argoproj.io/backend.update-strategy: digest
     argocd-image-updater.argoproj.io/frontend.update-strategy: digest
     argocd-image-updater.argoproj.io/backend.pull-secret: pullsecret:argocd/ghcr-image-updater

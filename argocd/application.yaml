@@ -11,6 +11,10 @@ metadata:
     argocd-image-updater.argoproj.io/frontend.update-strategy: digest
     argocd-image-updater.argoproj.io/backend.pull-secret: pullsecret:argocd/ghcr-image-updater
     argocd-image-updater.argoproj.io/frontend.pull-secret: pullsecret:argocd/ghcr-image-updater
+    argocd-image-updater.argoproj.io/backend.helm.image-name: backend.image
+    argocd-image-updater.argoproj.io/backend.helm.image-tag: backend.tag
+    argocd-image-updater.argoproj.io/frontend.helm.image-name: frontend.image
+    argocd-image-updater.argoproj.io/frontend.helm.image-tag: frontend.tag
 spec:
   project: default
   source:

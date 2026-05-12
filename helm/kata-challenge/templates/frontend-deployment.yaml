@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: frontend
 spec:
+  revisionHistoryLimit: 2
   replicas: {{ .Values.frontend.replicas }}
   selector:
     matchLabels:
@@ -16,6 +17,6 @@ spec:
         - name: ghcr-secret
       containers:
         - name: frontend
-          image: "{{ .Values.registry }}/{{ .Values.frontend.image }}:{{ .Values.frontend.tag }}"
+          image: "{{ .Values.frontend.image }}:{{ .Values.frontend.tag }}"
           ports:
             - containerPort: {{ .Values.frontend.port }}

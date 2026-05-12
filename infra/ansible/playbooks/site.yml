@@ -1,5 +1,8 @@
-- name: Instalar ArgoCD
+- name: Install ArgoCD
   hosts: controllers
   become: false
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/vault.yml
   roles:
     - deploy_argocd

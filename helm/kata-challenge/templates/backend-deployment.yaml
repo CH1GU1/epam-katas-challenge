@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: backend
 spec:
+  revisionHistoryLimit: 2
   replicas: {{ .Values.backend.replicas }}
   selector:
     matchLabels:
@@ -16,7 +17,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: backend
-          image: "{{ .Values.registry }}/{{ .Values.backend.image }}:{{ .Values.backend.tag }}"
+          image: "{{ .Values.backend.image }}:{{ .Values.backend.tag }}"
           ports:
             - containerPort: {{ .Values.backend.port }}
           livenessProbe:

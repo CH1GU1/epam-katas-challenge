@@ -1,2 +1,4 @@
 ansible_user: "{{ lookup('env', 'USER') }}"
 kubeconfig_path: "{{ lookup('env', 'HOME') }}/.kube/config"
+ghcr_username: ch1gu1
+ghcr_email: kamcak@hotmail.es

@@ -27,6 +27,41 @@
     kubectl wait --for=condition=available deployment/argocd-image-updater
     -n argocd --timeout=180s
 
+- name: Create GHCR secret for Image Updater
+  command: >
+    kubectl create secret docker-registry ghcr-image-updater
+    --docker-server=ghcr.io
+    --docker-username={{ ghcr_username }}
+    --docker-password={{ ghcr_token }}
+    -n argocd
+  register: updater_secret_result
+  failed_when:
+    - updater_secret_result.rc != 0
+    - '"already exists" not in updater_secret_result.stderr'
+  changed_when: updater_secret_result.rc == 0
+
+- name: Create kata-challenge namespace
+  command: kubectl create namespace kata-challenge
+  register: ns_kata_result
+  failed_when:
+    - ns_kata_result.rc != 0
+    - '"already exists" not in ns_kata_result.stderr'
+  changed_when: ns_kata_result.rc == 0
+
+- name: Create GHCR pull secret for kata-challenge
+  command: >
+    kubectl create secret docker-registry ghcr-secret
+    --docker-server=ghcr.io
+    --docker-username={{ ghcr_username }}
+    --docker-password={{ ghcr_token }}
+    --docker-email={{ ghcr_email }}
+    -n kata-challenge
+  register: pull_secret_result
+  failed_when:
+    - pull_secret_result.rc != 0
+    - '"already exists" not in pull_secret_result.stderr'
+  changed_when: pull_secret_result.rc == 0
+
 - name: Apply ArgoCD Application manifest
   command: >
     kubectl apply -f {{ playbook_dir }}/../../../argocd/application.yaml

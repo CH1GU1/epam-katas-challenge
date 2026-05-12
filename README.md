@@ -478,16 +478,14 @@ helm uninstall kata-challenge
 ### Configuration (values.yaml)
 
 ```yaml
-registry: ghcr.io
-
 backend:
-  image: ch1gu1/epam-katas-challenge-backend
+  image: ghcr.io/ch1gu1/epam-katas-challenge-backend
   tag: latest
   port: 8000
   replicas: 1
 
 frontend:
-  image: ch1gu1/epam-katas-challenge-frontend
+  image: ghcr.io/ch1gu1/epam-katas-challenge-frontend
   tag: latest
   port: 80
   replicas: 1
@@ -496,6 +494,8 @@ frontend:
 ingress:
   host: kata-challenge.local
 ```
+
+> ℹ️ **Note**: Images use the full registry path (`ghcr.io/...`) directly in `values.yaml`. The Helm templates reference `.Values.backend.image` and `.Values.frontend.image` without a separate `registry` prefix. Both deployments also set `revisionHistoryLimit: 2` to keep only the last two ReplicaSet revisions.
 
 ### ArgoCD (GitOps)
 
@@ -523,22 +523,64 @@ kubectl apply -f argocd/application.yaml
 Image Updater is installed automatically by the [Ansible playbook](#ansible). It works alongside ArgoCD to solve the "`latest` tag doesn't trigger a sync" problem:
 
 - Polls GHCR every few minutes for new images
-- Compares image digests to detect changes (even when the tag is still `latest`)
+- Uses **digest strategy** to compare image digests (even when the tag is still `latest`)
 - Updates the Helm chart parameters in the ArgoCD Application automatically
 - Triggers ArgoCD to sync and redeploy the pods
 
-The `application.yaml` contains the necessary annotations for Image Updater to track both the backend and frontend images.
+The `application.yaml` configures Image Updater with:
+
+- `image-list` pointing both services to `:latest` with explicit `digest` strategy
+- `pull-secret` references (`ghcr-image-updater` in the `argocd` namespace) so Image Updater can authenticate with GHCR
+- Per-service `helm.image-name` and `helm.image-tag` mappings so Image Updater writes back to the correct Helm values
+
+> ℹ️ **Note**: The `write-back-method: argocd` annotation is no longer used. Image Updater updates the ArgoCD Application parameters directly, which ArgoCD then detects and syncs.
 
 ### Ansible
 
-For clusters that don't have ArgoCD yet, the Ansible playbook installs both **ArgoCD** and **ArgoCD Image Updater**:
+For clusters that don't have ArgoCD yet, the Ansible playbook installs both **ArgoCD** and **ArgoCD Image Updater**, and also bootstraps the required Kubernetes resources (namespace and pull secrets).
+
+#### What the playbook does
+
+1. Installs **ArgoCD** in the `argocd` namespace
+2. Installs **ArgoCD Image Updater** in the `argocd` namespace
+3. Creates the `ghcr-image-updater` secret in `argocd` — used by Image Updater to authenticate with GHCR
+4. Creates the `kata-challenge` namespace
+5. Creates the `ghcr-secret` pull secret in `kata-challenge` — used by pods to pull images
+6. Applies the ArgoCD Application manifest
+
+#### Variables
+
+The playbook loads two variable files:
+
+**`group_vars/all.yml`** (plaintext):
+```yaml
+ansible_user: "{{ lookup('env', 'USER') }}"
+kubeconfig_path: "{{ lookup('env', 'HOME') }}/.kube/config"
+ghcr_username: ch1gu1
+ghcr_email: kamcak@hotmail.es
+```
+
+**`group_vars/vault.yml`** (encrypted with Ansible Vault):
+```yaml
+ghcr_token: YOUR_GITHUB_PERSONAL_ACCESS_TOKEN
+```
+
+> 💡 **Tip**: Generate a GitHub Personal Access Token with `read:packages` scope at [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens).
+
+Before running the playbook, make sure the vault contains your token:
 
 ```bash
 cd infra/ansible
+ansible-vault edit group_vars/vault.yml
+```
+
+Then run the playbook:
+
+```bash
 ansible-playbook -i inventory/hosts.ini playbooks/site.yml
 ```
 
-This is typically a one-time setup step before applying the ArgoCD application.
+> 🔒 **Security**: `vault.yml` is encrypted with Ansible Vault. The repository includes an encrypted version; you should replace it with your own token using `ansible-vault create` or `ansible-vault edit`.
 
 ---
 
@@ -560,7 +602,7 @@ kubectl get nodes
 
 ### 2. Install ArgoCD via Ansible
 
-Run the Ansible playbook to install **ArgoCD** and **ArgoCD Image Updater** in the cluster:
+Run the Ansible playbook to install **ArgoCD**, **ArgoCD Image Updater**, and the required pull secrets in the cluster:
 
 ```bash
 cd ~/epam-katas-challenge/infra/ansible
@@ -570,29 +612,28 @@ ansible-playbook playbooks/site.yml -i inventory/hosts.ini
 > This is a one-time setup. The playbook installs:
 > - **ArgoCD** — the GitOps controller
 > - **ArgoCD Image Updater** — watches GHCR and auto-updates images when new versions are pushed
+> - **GHCR secrets** — both for Image Updater (`argocd` namespace) and for pod image pulls (`kata-challenge` namespace)
 >
 > Once installed, both services manage all future application deployments automatically.
 
-### 3. Create the GHCR Pull Secret
+> ⚠️ **Prerequisite**: Before running the playbook, edit `group_vars/all.yml` with your GHCR username/email, and create/edit `group_vars/vault.yml` with your GitHub Personal Access Token (encrypted with Ansible Vault). See the [Ansible](#ansible) section for details.
 
-ArgoCD will deploy pods that need to pull images from GitHub Container Registry. Create a Docker registry secret in the target namespace:
+### 3. Verify Secrets (Optional)
+
+If you want to confirm the playbook created everything correctly:
 
 ```bash
-# Create the namespace first
-kubectl create namespace kata-challenge
+# Image Updater pull secret
+kubectl get secret ghcr-image-updater -n argocd
 
-# Create the pull secret
-kubectl create secret docker-registry ghcr-secret \
-  --docker-server=ghcr.io \
-  --docker-username=ch1gu1 \
-  --docker-password=YOUR_GITHUB_TOKEN \
-  --docker-email=YOUR_EMAIL@gmail.com \
-  -n kata-challenge
+# Application namespace and pull secret
+kubectl get namespace kata-challenge
+kubectl get secret ghcr-secret -n kata-challenge
 ```
 
-> 💡 **Tip**: Generate a GitHub Personal Access Token with `read:packages` scope at [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens).
+If any are missing, check that `group_vars/vault.yml` contains a valid `ghcr_token`.
 
-### 3. Apply the ArgoCD Application
+### 4. Apply the ArgoCD Application
 
 Connect the Git repository to ArgoCD so it can auto-sync the Helm chart:
 
@@ -602,7 +643,7 @@ kubectl apply -f argocd/application.yaml
 
 ArgoCD will now watch the `helm/kata-challenge` directory and automatically deploy any changes. **Image Updater** (installed by the Ansible playbook) will separately watch GHCR and update image tags when new images are pushed, causing ArgoCD to resync automatically.
 
-### 4. Access the Services (Windows)
+### 5. Access the Services (Windows)
 
 Use `kubectl port-forward` to expose the services locally:
 
@@ -619,7 +660,7 @@ kubectl port-forward svc/ingress-nginx-controller 8888:80 -n ingress-nginx
 | Application | http://localhost:8888 |
 | ArgoCD UI | https://localhost:8080 |
 
-### 5. Get the ArgoCD Admin Password
+### 6. Get the ArgoCD Admin Password
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret \
@@ -630,7 +671,7 @@ Login with:
 - **Username**: `admin`
 - **Password**: (the output from the command above)
 
-### 6. Verify Everything is Running
+### 7. Verify Everything is Running
 
 ```bash
 # Check the application namespace
@@ -659,12 +700,14 @@ No manual sync, no hard refresh, no `kubectl rollout restart` needed.
 
 | Issue | Fix |
 |-------|-----|
-| `ImagePullBackOff` | Verify the `ghcr-secret` exists and the token has `read:packages` |
-| `ErrImagePull` | Check that the image tag in `helm/kata-challenge/values.yaml` matches what's in GHCR |
+| `ImagePullBackOff` | Verify the `ghcr-secret` exists in `kata-challenge` and the token has `read:packages` scope |
+| `ErrImagePull` | Check that the image in `helm/kata-challenge/values.yaml` matches what's in GHCR (full path: `ghcr.io/ch1gu1/...`) |
 | Ingress not working | Ensure `minikube addons enable ingress` was run |
 | ArgoCD not syncing | Check the ArgoCD UI at `https://localhost:8080` for sync errors |
 | ArgoCD green but app not updated | ArgoCD only watches Git. Check that **Image Updater** pod is running (`kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-image-updater`). Also verify Image Updater can reach GHCR. |
 | Image Updater not detecting new images | Check Image Updater logs: `kubectl logs -n argocd deployment/argocd-image-updater`. Ensure `application.yaml` annotations are correct and the images are accessible from the cluster. |
+| Ansible asks for vault password | You need the vault password to decrypt `group_vars/vault.yml`. If you don't have it, recreate the file with your own token: `ansible-vault create infra/ansible/group_vars/vault.yml` |
+| Secrets not created by Ansible | Ensure `ghcr_token` inside `vault.yml` is valid and the vault was decrypted correctly during the playbook run |
 
 ---
 
